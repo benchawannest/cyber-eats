@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบแอดมิน - Cyber Eats</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <header>
+    <h1>ADMIN DASHBOARD ⚙️</h1>
+    <nav>
+      <a href="index.html">หน้าสั่งอาหาร</a>
+      <a href="admin.html" class="active">ระบบแอดมิน</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    
+    <!-- ป๊อปอัป ล็อกอินแอดมิน -->
+    <div id="admin-login-modal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0f172a; display: flex; align-items: center; justify-content: center; z-index: 9999;">
+      <div style="background: #1e293b; padding: 2rem; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); width: 90%; max-width: 360px; text-align: center; color: white; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+        <h2 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 1.5rem;">🔒 เข้าสู่ระบบแอดมิน</h2>
+        <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 1.5rem;">กรุณากรอกรหัสผ่านเพื่อจัดการร้านอาหาร</p>
+        
+        <input type="password" id="admin-pin-input" placeholder="กรอกรหัสผ่าน" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; text-align: center; font-size: 1.2rem; font-weight: bold; margin-bottom: 1rem; box-sizing: border-box; outline: none;">
+        <p id="admin-login-error" style="color: #ef4444; font-size: 0.85rem; display: none; margin-top: 0; margin-bottom: 1rem;">❌ รหัสผ่านไม่ถูกต้อง</p>
+        
+        <button onclick="checkAdminPin()" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: none; background: linear-gradient(135deg, #ec4899, #8b5cf6); color: white; font-weight: bold; font-size: 1rem; cursor: pointer;">เข้าสู่ระบบ</button>
+      </div>
+    </div>
+
+    <!-- ส่วนสรุปสถิติ -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+      <div class="card" style="padding: 1.5rem;">
+        <p style="color: var(--text-muted); margin-bottom: 0.5rem;">ยอดขายทั้งหมด ( Paid Status )</p>
+        <h2 id="stat-total-sales" style="font-size: 2.2rem; color: #F472B6;">฿0</h2>
+      </div>
+      <div class="card" style="padding: 1.5rem;">
+        <p style="color: var(--text-muted); margin-bottom: 0.5rem;">เมนูลูกค้าสั่งเยอะสุด</p>
+        <h2 id="stat-top-menu" style="font-size: 1.3rem; color: #38BDF8;">-</h2>
+      </div>
+    </div>
+
+    <!-- ปุ่มควบคุม -->
+    <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
+      <button class="btn-primary" style="width: auto;" onclick="openModal('add-menu-modal')">+ เพิ่มเมนูอาหาร</button>
+      <button class="btn-primary" style="width: auto; background: linear-gradient(135deg, #8B5CF6, #EC4899);" onclick="openModal('create-order-modal')">📝 สร้าง Order ใหม่</button>
+    </div>
+
+    <!-- ตารางรายการเมนูทั้งหมด -->
+    <section style="margin-bottom: 3rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="color: #fff; font-size: 1.4rem;">รายการเมนูทั้งหมด</h2>
+        <input type="text" placeholder="🔍 ค้นหาเมนู..." oninput="loadAdminMenus(this.value)" style="padding: 0.5rem 1rem; border-radius: 8px; background: rgba(30,41,59,0.8); border: 1px solid var(--border); color: #fff; outline: none;">
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; background: rgba(30,41,59,0.5); border-radius: 12px; overflow: hidden;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border); color: var(--text-muted);">
+              <th style="padding: 1rem;">ID</th>
+              <th style="padding: 1rem;">รูปภาพ</th>
+              <th style="padding: 1rem;">ชื่อเมนู</th>
+              <th style="padding: 1rem;">หมวดหมู่</th>
+              <th style="padding: 1rem;">ราคา</th>
+              <th style="padding: 1rem;">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="admin-menu-table"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- รายการ Orders ทั้งหมด -->
+    <section style="margin-bottom: 3rem;">
+      <h2 style="color: #fff; font-size: 1.4rem; margin-bottom: 1rem;">รายการ Orders ทั้งหมด</h2>
+      <div id="admin-orders-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.2rem;"></div>
+    </section>
+
+  </div>
+
+  <!-- Pop-up เพิ่มเมนู -->
+  <div class="modal-overlay" id="add-menu-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>➕ เพิ่มเมนูอาหารใหม่</h3>
+        <button class="close-btn" onclick="closeModal('add-menu-modal')">&times;</button>
+      </div>
+      <form id="add-menu-form" onsubmit="handleAddMenu(event)" style="display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem;">
+        <input type="text" id="m-name" placeholder="ชื่อเมนูอาหาร" required style="padding:0.75rem; border-radius:8px; background:rgba(15,23,42,0.6); border:1px solid var(--border); color:#fff;">
+        <input type="number" id="m-price" placeholder="ราคา (บาท)" min="1" step="0.01" required style="padding:0.75rem; border-radius:8px; background:rgba(15,23,42,0.6); border:1px solid var(--border); color:#fff;">
+        <select id="m-category" style="padding:0.75rem; border-radius:8px; background:rgba(15,23,42,0.6); border:1px solid var(--border); color:#fff;">
+          <option value="Thai">🌶️ อาหารไทย</option>
+          <option value="Japanese">🍱 อาหารญี่ปุ่น</option>
+          <option value="Korean">🍗 อาหารเกาหลี</option>
+          <option value="General">🍽️ ทั่วไป</option>
+        </select>
+        
+        <div>
+          <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">เลือกรูปภาพอาหารจากเครื่อง</label>
+          <input type="file" id="m-file" accept="image/*" required style="width: 100%; padding:0.6rem; border-radius:8px; background:rgba(15,23,42,0.6); border:1px solid var(--border); color:#fff;">
+        </div>
+
+        <button type="submit" id="add-submit-btn" class="btn-primary" style="margin-top: 0.5rem;">บันทึกเมนู</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Pop-up สร้าง Order ใหม่ -->
+  <div class="modal-overlay" id="create-order-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>📝 สร้าง Order ใหม่ (แอดมิน)</h3>
+        <button class="close-btn" onclick="closeModal('create-order-modal')">&times;</button>
+      </div>
+      <form onsubmit="handleAdminCreateOrder(event)" style="display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem;">
+        <input type="number" id="admin-table-num" placeholder="หมายเลขโต๊ะ" min="1" required style="padding:0.75rem; border-radius:8px; background:rgba(15,23,42,0.6); border:1px solid var(--border); color:#fff;">
+        <select id="admin-menu-select" style="padding:0.75rem; border-radius:8px; background:rgba(15,23,42,0.6); border:1px solid var(--border); color:#fff;"></select>
+        <input type="number" id="admin-qty" placeholder="จำนวน" value="1" min="1" required style="padding:0.75rem; border-radius:8px; background:rgba(15,23,42,0.6); border:1px solid var(--border); color:#fff;">
+        <button type="submit" class="btn-primary" style="margin-top: 0.5rem;">ยืนยันสร้าง Order</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Pop-up ยืนยันการลบ -->
+  <div id="delete-modal" class="modal-overlay">
+    <div style="background: #1e293b; padding: 2rem 1.5rem; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); width: 90%; max-width: 380px; text-align: center; color: white; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+      <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🗑️</div>
+      <h3 style="margin: 0 0 0.5rem 0; font-size: 1.3rem;">ยืนยันการลบรายการ</h3>
+      <p id="delete-modal-text" style="color: #94a3b8; font-size: 0.95rem; margin-bottom: 1.5rem; line-height: 1.5;">คุณต้องการลบรายการนี้ใช่หรือไม่?</p>
+      
+      <div style="display: flex; gap: 0.75rem; justify-content: center;">
+        <button onclick="closeDeleteModal()" style="padding: 0.65rem 1.25rem; border-radius: 8px; border: none; background: #334155; color: #cbd5e1; font-weight: 600; cursor: pointer;">ยกเลิก</button>
+        <button id="btn-confirm-delete" style="padding: 0.65rem 1.25rem; border-radius: 8px; border: none; background: linear-gradient(135deg, #ef4444, #dc2626); color: white; font-weight: 600; cursor: pointer;">ยืนยันลบ</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">
+    <span class="toast-icon">✅</span>
+    <span id="toast-message">แจ้งเตือน</span>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    const ADMIN_PIN = "1234"; 
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const isAuthorized = sessionStorage.getItem("admin_logged_in");
+      const modal = document.getElementById("admin-login-modal");
+      
+      if (isAuthorized === "true") {
+        if (modal) modal.style.display = "none";
+      } else {
+        if (modal) modal.style.display = "flex";
+      }
+    });
+
+    function checkAdminPin() {
+      const pinInput = document.getElementById("admin-pin-input").value;
+      const errorText = document.getElementById("admin-login-error");
+      const modal = document.getElementById("admin-login-modal");
+
+      if (pinInput === ADMIN_PIN) {
+        sessionStorage.setItem("admin_logged_in", "true");
+        if (modal) modal.style.display = "none";
+      } else {
+        if (errorText) errorText.style.display = "block";
+      }
+    }
+
+    let menuIdToDelete = null;
+
+    function deleteMenu(menuId, menuName) {
+      menuIdToDelete = menuId;
+      const modal = document.getElementById('delete-modal');
+      const textEl = document.getElementById('delete-modal-text');
+      const confirmBtn = document.getElementById('btn-confirm-delete');
+
+      if (textEl) {
+        textEl.innerHTML = menuName 
+          ? `คุณต้องการลบรายการ <b style="color: #ec4899;">"${menuName}"</b> ใช่หรือไม่?` 
+          : `คุณต้องการลบรายการนี้ใช่หรือไม่?`;
+      }
+
+      if (confirmBtn) {
+        confirmBtn.onclick = async () => {
+          await executeDeleteMenu(menuIdToDelete);
+          closeDeleteModal();
+        };
+      }
+
+      if (modal) modal.classList.add('active');
+    }
+
+    function closeDeleteModal() {
+      const modal = document.getElementById('delete-modal');
+      if (modal) modal.classList.remove('active');
+      menuIdToDelete = null;
+    }
+
+    async function executeDeleteMenu(menuId) {
+      try {
+        let { error } = await supabaseClient.from('menus').delete().eq('menu_id', menuId);
+        if (error) {
+          await supabaseClient.from('menus').delete().eq('id', menuId);
+        }
+
+        showToast('ลบรายการสำเร็จแล้ว');
+        loadAdminData();
+      } catch (err) {
+        console.error('Error deleting menu:', err.message);
+        alert('เกิดข้อผิดพลาดในการลบรายการ: ' + err.message);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (typeof loadAdminData === 'function') {
+        loadAdminData();
+      }
+    });
+
+    if (window.supabaseClient) {
+      supabaseClient
+        .channel('public:orders')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
+          loadAdminOrders();
+          loadDashboardStats();
+        })
+        .subscribe();
+    }
+    
+  </script>
+  <!-- Modal: แก้ไขเมนูอาหาร -->
+<div class="modal-overlay" id="edit-menu-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>✏️ แก้ไขเมนูอาหาร</h3>
+      <button class="close-btn" onclick="closeModal('edit-menu-modal')">&times;</button>
+    </div>
+    <form id="edit-menu-form" onsubmit="handleUpdateMenu(event)" style="display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem;">
+      <input type="hidden" id="edit-m-id">
+      <input type="text" id="edit-m-name" placeholder="ชื่อเมนูอาหาร" required style="padding:0.75rem; border-radius:8px; background:rgba(15,23,42,0.6); border:1px solid var(--border); color:#fff;">
+      <input type="number" id="edit-m-price" placeholder="ราคา (บาท)" min="1" step="0.01" required style="padding:0.75rem; border-radius:8px; background:rgba(15,23,42,0.6); border:1px solid var(--border); color:#fff;">
+      <select id="edit-m-category" style="padding:0.75rem; border-radius:8px; background:rgba(15,23,42,0.6); border:1px solid var(--border); color:#fff;">
+        <option value="Thai">🌶️ อาหารไทย</option>
+        <option value="Japanese">🍱 อาหารญี่ปุ่น</option>
+        <option value="Korean">🍗 อาหารเกาหลี</option>
+        <option value="General">🍽️ ทั่วไป</option>
+      </select>
+      
+      <div>
+        <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.3rem;">เปลี่ยนรูปภาพ (หากไม่เปลี่ยนให้เว้นว่างไว้)</label>
+        <input type="file" id="edit-m-file" accept="image/*" style="width: 100%; padding:0.6rem; border-radius:8px; background:rgba(15,23,42,0.6); border:1px solid var(--border); color:#fff;">
+      </div>
+
+      <button type="submit" id="edit-submit-btn" class="btn-primary" style="margin-top: 0.5rem; background: linear-gradient(135deg, #3b82f6, #8b5cf6);">บันทึกการแก้ไข</button>
+    </form>
+  </div>
+</div>
+</body>
+</html>
